@@ -29,11 +29,13 @@ jobs:
           command: |
             # Remove any existing gcloud installation to avoid conflicts
             sudo rm -rf /home/circleci/google-cloud-sdk || true
-            # Install fresh Google Cloud SDK
-            curl https://sdk.cloud.google.com | bash > /dev/null
+            # Download and install Google Cloud SDK non-interactively
+            cd /home/circleci
+            curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-458.0.1-linux-x86_64.tar.gz
+            tar -xf google-cloud-cli-458.0.1-linux-x86_64.tar.gz
+            ./google-cloud-sdk/install.sh --quiet --usage-reporting=false --path-update=true
             echo 'export PATH="$HOME/google-cloud-sdk/bin:$PATH"' >> $BASH_ENV
-            source $HOME/google-cloud-sdk/path.bash.inc
-            gcloud components update --quiet
+            source $BASH_ENV
       - run:
           name: Build app binary and Docker image
           command: |
