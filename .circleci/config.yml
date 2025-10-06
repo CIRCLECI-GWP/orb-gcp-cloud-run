@@ -19,7 +19,7 @@ jobs:
             pytest
   build_push_image_cloud_run_managed:
     docker:
-      - image: cimg/python:3.11
+      - image: cimg/python:3.9
     steps:
       - checkout
       - setup_remote_docker:
