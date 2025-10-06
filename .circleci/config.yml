@@ -37,16 +37,45 @@ jobs:
             echo 'export PATH="$HOME/google-cloud-sdk/bin:$PATH"' >> $BASH_ENV
             source $BASH_ENV
       - run:
+          name: Setup Google Cloud credentials
+          command: |
+            # Decode the service account key with better error handling
+            echo "Decoding service account key..."
+            # Remove any potential whitespace and decode
+            echo "${GCP_PROJECT_KEY}" | tr -d '[:space:]' | base64 --decode > $HOME/gcloud-service-key.json
+            # Verify the JSON is valid
+            if python3 -m json.tool $HOME/gcloud-service-key.json > /dev/null 2>&1; then
+              echo "Service account key is valid JSON"
+              # Show file size for verification
+              ls -la $HOME/gcloud-service-key.json
+            else
+              echo "ERROR: Invalid JSON in service account key"
+              echo "File size and first few characters:"
+              ls -la $HOME/gcloud-service-key.json
+              head -c 200 $HOME/gcloud-service-key.json
+              echo ""
+              echo "Checking if base64 variable is set..."
+              echo "GCP_PROJECT_KEY length: ${#GCP_PROJECT_KEY}"
+              exit 1
+            fi
+            # Set environment variable for orbs
+            echo 'export GOOGLE_CLOUD_KEYS=$(cat $HOME/gcloud-service-key.json)' >> $BASH_ENV
+      - run:
           name: Build app binary and Docker image
           command: |
-            echo ${GCP_PROJECT_KEY} | base64 --decode --ignore-garbage > $HOME/gcloud-service-key.json
-            export GOOGLE_CLOUD_KEYS=$(cat $HOME/gcloud-service-key.json)
             export TAG=${CIRCLE_SHA1}
             export IMAGE_NAME=$CIRCLE_PROJECT_REPONAME
             pip install --user --upgrade pip
             pip install --user -r requirements.txt
             pyinstaller -F hello_world.py
             docker build -t us.gcr.io/$GOOGLE_PROJECT_ID/$IMAGE_NAME -t us.gcr.io/$GOOGLE_PROJECT_ID/$IMAGE_NAME:$TAG .
+      - run:
+          name: Authenticate with Google Cloud
+          command: |
+            # Use the validated service account key
+            gcloud auth activate-service-account --key-file=$HOME/gcloud-service-key.json
+            gcloud config set project $GOOGLE_PROJECT_ID
+            gcloud auth configure-docker --quiet
       - gcp-gcr/gcr-auth:
           gcloud-service-key: GOOGLE_CLOUD_KEYS
           google-project-id: GOOGLE_PROJECT_ID
