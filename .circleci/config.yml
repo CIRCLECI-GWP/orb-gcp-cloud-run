@@ -5,7 +5,7 @@ orbs:
 jobs:
   build_test:
     docker:
-      - image: cimg/python:3.12
+      - image: cimg/python:3.11
     steps:
       - checkout
       - run:
@@ -19,7 +19,7 @@ jobs:
             pytest
   build_push_image_cloud_run_managed:
     docker:
-      - image: cimg/python:3.12
+      - image: cimg/python:3.11
     steps:
       - checkout
       - setup_remote_docker:
