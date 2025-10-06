@@ -1,7 +1,7 @@
 version: 2.1
 orbs:
-  gcp-gcr: circleci/gcp-gcr@0.16.1
-  cloudrun: circleci/gcp-cloud-run@1.0.4
+  gcp-gcr: circleci/gcp-gcr@0.15.0
+  cloudrun: circleci/gcp-cloud-run@1.0.2
 jobs:
   build_test:
     docker:
@@ -25,13 +25,6 @@ jobs:
       - setup_remote_docker:
           docker_layer_caching: false
       - run:
-          name: Install Google Cloud SDK
-          command: |
-            curl https://sdk.cloud.google.com | bash > /dev/null
-            echo 'source $HOME/google-cloud-sdk/path.bash.inc' >> $BASH_ENV
-            source $BASH_ENV
-            gcloud components update --quiet
-      - run:
           name: Build app binary and Docker image
           command: |
             echo ${GCP_PROJECT_KEY} | base64 --decode --ignore-garbage > $HOME/gcloud-service-key.json
@@ -42,29 +35,20 @@ jobs:
             pip install --user -r requirements.txt
             pyinstaller -F hello_world.py
             docker build -t us.gcr.io/$GOOGLE_PROJECT_ID/$IMAGE_NAME -t us.gcr.io/$GOOGLE_PROJECT_ID/$IMAGE_NAME:$TAG .
-      - run:
-          name: Authenticate with Google Cloud
-          command: |
-            echo ${GCP_PROJECT_KEY} | base64 --decode --ignore-garbage > $HOME/gcloud-service-key.json
-            gcloud auth activate-service-account --key-file=$HOME/gcloud-service-key.json
-            gcloud config set project $GOOGLE_PROJECT_ID
-            gcloud auth configure-docker --quiet
-      - run:
-          name: Push Docker image to GCR
-          command: |
-            export TAG=${CIRCLE_SHA1}
-            export IMAGE_NAME=$CIRCLE_PROJECT_REPONAME
-            docker push us.gcr.io/$GOOGLE_PROJECT_ID/$IMAGE_NAME:$TAG
-            docker push us.gcr.io/$GOOGLE_PROJECT_ID/$IMAGE_NAME:latest
-      - run:
-          name: Deploy to Cloud Run
-          command: |
-            export IMAGE_NAME=$CIRCLE_PROJECT_REPONAME
-            gcloud run deploy orb-gcp-cloud-run \
-              --image us.gcr.io/$GOOGLE_PROJECT_ID/$IMAGE_NAME:${CIRCLE_SHA1} \
-              --platform managed \
-              --region $GOOGLE_COMPUTE_ZONE \
-              --allow-unauthenticated
+      - gcp-gcr/gcr-auth:
+          gcloud-service-key: GOOGLE_CLOUD_KEYS
+          google-project-id: GOOGLE_PROJECT_ID
+          google-compute-zone: GOOGLE_COMPUTE_ZONE
+      - gcp-gcr/push-image:
+          google-project-id: GOOGLE_PROJECT_ID
+          registry-url: "us.gcr.io"
+          image: $IMAGE_NAME
+      - cloudrun/deploy:
+          platform: "managed"
+          image: "us.gcr.io/$GOOGLE_PROJECT_ID/$IMAGE_NAME"
+          service-name: "orb-gcp-cloud-run"
+          region: $GOOGLE_COMPUTE_ZONE
+          unauthenticated: true
 workflows:
   build_test_deploy:
     jobs:
