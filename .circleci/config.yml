@@ -39,53 +39,21 @@ jobs:
       - run:
           name: Setup Google Cloud credentials and environment
           command: |
-            # Decode the service account key with better error handling
-            echo "Decoding service account key..."
-            # Remove any potential whitespace and decode
+            # Decode the service account key
             echo "${GCP_PROJECT_KEY}" | tr -d '[:space:]' | base64 --decode > $HOME/gcloud-service-key.json
-            # Verify the JSON is valid
-            if python3 -m json.tool $HOME/gcloud-service-key.json > /dev/null 2>&1; then
-              echo "Service account key is valid JSON"
-              # Show file size for verification
-              ls -la $HOME/gcloud-service-key.json
-            else
-              echo "ERROR: Invalid JSON in service account key"
-              echo "File size and first few characters:"
-              ls -la $HOME/gcloud-service-key.json
-              head -c 200 $HOME/gcloud-service-key.json
-              echo ""
-              echo "Checking if base64 variable is set..."
-              echo "GCP_PROJECT_KEY length: ${#GCP_PROJECT_KEY}"
-              exit 1
-            fi
             # Set environment variables for orbs and subsequent steps
             echo 'export GOOGLE_CLOUD_KEYS=$(cat $HOME/gcloud-service-key.json)' >> $BASH_ENV
             echo "export TAG=${CIRCLE_SHA1}" >> $BASH_ENV
             echo "export IMAGE_NAME=${CIRCLE_PROJECT_REPONAME}" >> $BASH_ENV
-            # Debug: Show environment variables
-            echo "Environment variables set:"
-            echo "TAG: ${CIRCLE_SHA1}"
-            echo "IMAGE_NAME: ${CIRCLE_PROJECT_REPONAME}"
-            echo "PROJECT_ID: ${GOOGLE_PROJECT_ID}"
       - run:
           name: Build app binary and Docker image
           command: |
             # Load environment variables
             source $BASH_ENV
-            echo "Building with:"
-            echo "TAG: $TAG"
-            echo "IMAGE_NAME: $IMAGE_NAME"
-            echo "PROJECT_ID: $GOOGLE_PROJECT_ID"
-
             pip install --user --upgrade pip
             pip install --user -r requirements.txt
             pyinstaller -F hello_world.py
-
-            # Build Docker image with proper tags
             docker build -t us.gcr.io/$GOOGLE_PROJECT_ID/$IMAGE_NAME:latest -t us.gcr.io/$GOOGLE_PROJECT_ID/$IMAGE_NAME:$TAG .
-
-            # Verify images were built
-            docker images | grep us.gcr.io/$GOOGLE_PROJECT_ID/$IMAGE_NAME
       - run:
           name: Authenticate with Google Cloud
           command: |
@@ -95,8 +63,6 @@ jobs:
             gcloud auth activate-service-account --key-file=$HOME/gcloud-service-key.json
             gcloud config set project $GOOGLE_PROJECT_ID
             gcloud auth configure-docker --quiet
-            # Verify authentication
-            gcloud config list
       - gcp-gcr/gcr-auth:
           gcloud-service-key: GOOGLE_CLOUD_KEYS
           google-project-id: GOOGLE_PROJECT_ID
