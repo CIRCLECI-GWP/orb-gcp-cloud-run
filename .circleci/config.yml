@@ -39,7 +39,7 @@ jobs:
       - run:
           name: Setup Google Cloud credentials and environment
           command: |
-            # Decode the service account key
+            # Decode the service account key.
             echo "${GCP_PROJECT_KEY}" | tr -d '[:space:]' | base64 --decode > $HOME/gcloud-service-key.json
             # Set environment variables for orbs and subsequent steps
             echo 'export GOOGLE_CLOUD_KEYS=$(cat $HOME/gcloud-service-key.json)' >> $BASH_ENV
